@@ -3,8 +3,8 @@
 import os
 import base64
 from nbconvert.exporters.html import HTMLExporter
-from .html_parser import TagTransform
-from .html_parser import HTMLTransformer as HT
+from .html_transformer import TagTransform
+from .html_transformer import HTMLTransformer as HT
 from ipython_genutils.ipstruct import Struct
 
 try:
