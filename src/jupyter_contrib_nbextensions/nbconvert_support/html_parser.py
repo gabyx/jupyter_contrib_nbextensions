@@ -51,7 +51,7 @@ class HTMLTransformer(HTMLParser):
         return self.htmlString
 
     def pushTagTransform(self, tagTransform):
-        for tag in tagTransform.get_tags():
+        for tag in tagTransform.tags:
             if tag not in self.tagTransforms:
                 queue = self.tagTransforms[tag] = []
             else:

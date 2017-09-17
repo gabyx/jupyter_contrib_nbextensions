@@ -29,13 +29,14 @@ class PyMarkdownPreprocessor(Preprocessor, EmbedHTMLExporter):
             Index of the cell being processed (see base.py)
         """
 
-        self.path = resources['metadata']['path']
         if cell.cell_type == "markdown":
             if 'attachments' in cell.keys():
                 self.attachments += cell['attachments']
             # Parse HTML and replace <img> tags with the embedded data
             transformer = HT()
-            transformer.pushTagTransform(ImgTagTransform(log=self.log))
+            transformer.pushTagTransform(ImgTagTransform(
+                path=resources['metadata']['path'],
+                log=self.log))
             transformer.feed(cell)
 
             # Convert back to HTML

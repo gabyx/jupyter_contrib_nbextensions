@@ -3,6 +3,7 @@
 import os
 import base64
 from nbconvert.exporters.html import HTMLExporter
+from .html_parser import TagTransform
 from .html_parser import HTMLTransformer as HT
 from ipython_genutils.ipstruct import Struct
 
@@ -12,14 +13,15 @@ except ImportError:
     from urllib2 import urlopen
 
 
-class ImgTagTransform(HT.TagTransform):
+class ImgTagTransform(TagTransform):
     """
         Transforms <img> tags in the HTML.
     """
 
-    def __init__(self, log):
+    def __init__(self, path, log):
         super(ImgTagTransform, self).__init__("ImgTagTransform", ["img"])
         self.log = log
+        self.path = path
 
     def transform(self, attrs):
         """Replace source url or file link with base64 encoded blob."""
@@ -59,6 +61,7 @@ class ImgTagTransform(HT.TagTransform):
         else:
             prefix = "data:image/" + imgformat + ';base64,'
 
+        self.log.info("embedded")
         attrs["src"] = prefix + b64_data
 
 
@@ -78,8 +81,6 @@ class EmbedHTMLExporter(HTMLExporter):
         output, resources = super(
             EmbedHTMLExporter, self).from_notebook_node(nb, resources)
 
-        self.path = resources['metadata']['path']
-
         # Get attachments
         self.attachments = Struct()
         for cell in nb.cells:
@@ -87,11 +88,13 @@ class EmbedHTMLExporter(HTMLExporter):
                 self.attachments += cell['attachments']
 
         # Parse HTML and replace <img> tags with the embedded data
-        parser = HT()
-        parser.pushTagTransform(ImgTagTransform(log=self.log))
-        parser.feed(output)
+        transformer = HT()
+        transformer.pushTagTransform(ImgTagTransform(
+            path=resources['metadata']['path'],
+            log=self.log))
+        transformer.feed(output)
 
         # Convert back to HTML
-        embedded_output = parser.get_html()
+        embedded_output = transformer.get_html()
 
         return embedded_output, resources
