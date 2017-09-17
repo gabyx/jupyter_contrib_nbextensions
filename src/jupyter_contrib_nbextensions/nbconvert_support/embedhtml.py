@@ -2,8 +2,8 @@
 
 import os
 import base64
-import lxml.etree as et
 from nbconvert.exporters.html import HTMLExporter
+from .html_parser import HTMLTransformer as HT
 from ipython_genutils.ipstruct import Struct
 
 try:
@@ -12,21 +12,19 @@ except ImportError:
     from urllib2 import urlopen
 
 
-class EmbedHTMLExporter(HTMLExporter):
+class ImgTagTransform(HT.TagTransform):
     """
-    :mod:`nbconvert` Exporter which embeds graphics as base64 into html.
-
-    Convert to HTML and embed graphics (pdf, svg and raster images) in the HTML
-    file.
-
-    Example usage::
-
-        jupyter nbconvert --to html_embed mynotebook.ipynb
+        Transforms <img> tags in the HTML.
     """
 
-    def replfunc(self, node):
+    def __init__(self, log):
+        super(ImgTagTransform, self).__init__("ImgTagTransform", ["img"])
+        self.log = log
+
+    def transform(self, attrs):
         """Replace source url or file link with base64 encoded blob."""
-        url = node.attrib["src"]
+
+        url = attrs["src"]
         imgformat = url.split('.')[-1]
 
         if url.startswith('data'):
@@ -43,8 +41,8 @@ class EmbedHTMLExporter(HTMLExporter):
             for imgformat in self.config.NbConvertBase.display_data_priority:
                 if imgformat in available_formats.keys():
                     b64_data = self.attachments[imgname][imgformat]
-                    node.attrib["src"] = "data:%s;base64," % imgformat \
-                                         + b64_data
+                    attrs["src"] = "data:%s;base64," % imgformat \
+                        + b64_data
                     return
             raise ValueError("""Could not find attachment for image '%s'
                                  in notebook""" % imgname)
@@ -61,7 +59,20 @@ class EmbedHTMLExporter(HTMLExporter):
         else:
             prefix = "data:image/" + imgformat + ';base64,'
 
-        node.attrib["src"] = prefix + b64_data
+        attrs["src"] = prefix + b64_data
+
+
+class EmbedHTMLExporter(HTMLExporter):
+    """
+    :mod:`nbconvert` Exporter which embeds graphics as base64 into html.
+
+    Convert to HTML and embed graphics (pdf, svg and raster images) in the HTML
+    file.
+
+    Example usage::
+
+        jupyter nbconvert --to html_embed mynotebook.ipynb
+    """
 
     def from_notebook_node(self, nb, resources=None, **kw):
         output, resources = super(
@@ -76,13 +87,11 @@ class EmbedHTMLExporter(HTMLExporter):
                 self.attachments += cell['attachments']
 
         # Parse HTML and replace <img> tags with the embedded data
-        parser = et.HTMLParser()
-        root = et.fromstring(output, parser=parser)
-        nodes = root.findall(".//img")
-        for n in nodes:
-            self.replfunc(n)
+        parser = HT()
+        parser.pushTagTransform(ImgTagTransform(log=self.log))
+        parser.feed(output)
 
         # Convert back to HTML
-        embedded_output = et.tostring(root, method="html")
+        embedded_output = parser.get_html()
 
         return embedded_output, resources

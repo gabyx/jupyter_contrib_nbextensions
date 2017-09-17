@@ -2,7 +2,7 @@
 """Nbconvert preprocessor for the embedding img sources into the cells."""
 
 from nbconvert.preprocessors import Preprocessor
-from .embedhtml import EmbedHTMLExporter, et
+from .embedhtml import EmbedHTMLExporter, HT, ImgTagTransform
 
 
 class PyMarkdownPreprocessor(Preprocessor, EmbedHTMLExporter):
@@ -34,17 +34,12 @@ class PyMarkdownPreprocessor(Preprocessor, EmbedHTMLExporter):
             if 'attachments' in cell.keys():
                 self.attachments += cell['attachments']
             # Parse HTML and replace <img> tags with the embedded data
-            parser = et.HTMLParser()
-            root = et.fromstring(cell, parser=parser)
-            nodes = root.findall(".//img")
-
-            for n in nodes:
-                # replfunc comes from the EmbedHTMLExporter class, and is all
-                # that is really needed from there
-                self.replfunc(n)
+            transformer = HT()
+            transformer.pushTagTransform(ImgTagTransform(log=self.log))
+            transformer.feed(cell)
 
             # Convert back to HTML
-            embedded_output = et.tostring(root, method="html")
+            embedded_output = transformer.get_html()
 
             return embedded_output, resources
         else:
